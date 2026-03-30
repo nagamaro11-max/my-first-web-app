@@ -1,53 +1,53 @@
 # CLAUDE.md
 
-## Project Overview
+## プロジェクト概要
 
-A minimal static website hosted on GitHub Pages. The site is a single-page HTML project with no build tools, frameworks, or dependencies.
+GitHub Pagesでホスティングされているシンプルな静的ウェブサイト。ビルドツール、フレームワーク、依存関係のない単一ページのHTMLプロジェクト。
 
-**Repository:** `nagamaro11-max/my-first-web-app`
+**リポジトリ:** `nagamaro11-max/my-first-web-app`
 
-## Directory Structure
+## ディレクトリ構成
 
 ```
 .
-├── CLAUDE.md       # AI assistant guidelines (this file)
-└── index.html      # Main (and only) webpage
+├── CLAUDE.md       # AIアシスタント向けガイドライン（このファイル）
+└── index.html      # メイン（唯一の）ウェブページ
 ```
 
-## Tech Stack
+## 技術スタック
 
-- **Language:** Plain HTML5
-- **Hosting:** GitHub Pages
-- **Build system:** None — static files served directly
+- **言語:** プレーンHTML5
+- **ホスティング:** GitHub Pages
+- **ビルドシステム:** なし — 静的ファイルをそのまま配信
 
-## Development
+## 開発方法
 
-### Local Preview
+### ローカルプレビュー
 
-Open `index.html` directly in a browser, or use any local HTTP server:
+`index.html` をブラウザで直接開くか、任意のローカルHTTPサーバーを使用：
 
 ```sh
 # Python
 python3 -m http.server 8000
 
-# Node.js (if available)
+# Node.js（利用可能な場合）
 npx serve .
 ```
 
-### Deployment
+### デプロイ
 
-The site deploys automatically via GitHub Pages when changes are pushed to `main`.
+`main` ブランチにプッシュすると、GitHub Pages経由で自動的にデプロイされる。
 
-## Code Conventions
+## コード規約
 
-- Use semantic HTML5 elements
-- Include `charset="UTF-8"` and responsive viewport meta tag in all HTML pages
-- Keep files minimal — no unnecessary frameworks or build tooling
-- No external dependencies unless explicitly needed
+- セマンティックなHTML5要素を使用する
+- すべてのHTMLページに `charset="UTF-8"` とレスポンシブ対応のviewportメタタグを含める
+- 不要なフレームワークやビルドツールを導入せず、ファイルは最小限に保つ
+- 明示的に必要でない限り、外部依存関係を追加しない
 
-## Guidelines for AI Assistants
+## AIアシスタント向けガイドライン
 
-- This is a simple static site — avoid introducing build tools, bundlers, or package managers unless the user requests them
-- When adding new pages, follow the existing HTML5 boilerplate pattern in `index.html`
-- Test changes by verifying valid HTML structure; there are no automated tests
-- Do not add `node_modules`, `package.json`, or other tooling files without being asked
+- シンプルな静的サイトのため、ユーザーから依頼がない限りビルドツール、バンドラー、パッケージマネージャーを導入しない
+- 新しいページを追加する際は、`index.html` の既存のHTML5ボイラープレートパターンに従う
+- 自動テストは存在しないため、HTMLの構造が正しいことを確認して変更を検証する
+- 依頼されていない限り、`node_modules`、`package.json` などのツール関連ファイルを追加しない
