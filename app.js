@@ -1,451 +1,487 @@
-/* =============================================================
+/* =============================================
    Sub-Agent Automation System — app.js
-   =============================================================
-   4つのサブエージェントがタスクキューからタスクを取得し、
-   並列で処理するシミュレーションを行います。
-   ============================================================= */
+   ============================================= */
 
-(() => {
-  "use strict";
+'use strict';
 
-  // ── 設定 ──────────────────────────────────
-  const TICK_MS = 120;           // メインループ間隔
-  const TASK_SPAWN_CHANCE = 0.35; // 毎tick新規タスク生成確率
-  const MAX_PENDING = 8;         // 待機キュー最大表示数
-  const MAX_DONE = 6;            // 完了ログ最大表示数
-  const CHART_BARS = 20;         // スループットチャートのバー数
+/* =============================================
+   PARTICLE SYSTEM
+   ============================================= */
+(function initParticles() {
+  const canvas = document.getElementById('particle-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
 
-  // ── タスク定義 ─────────────────────────────
-  const TASK_POOL = [
-    { name: "データセット前処理",        icon: "📊", type: "前処理",   priority: "high" },
-    { name: "NLPトークナイズ",           icon: "🔤", type: "自然言語", priority: "medium" },
-    { name: "画像特徴量抽出",            icon: "🖼️", type: "画像処理", priority: "high" },
-    { name: "APIレスポンス解析",          icon: "🌐", type: "通信",    priority: "medium" },
-    { name: "モデル推論実行",            icon: "🧠", type: "推論",    priority: "high" },
-    { name: "ログ集約・フィルタ",         icon: "📋", type: "監視",    priority: "low" },
-    { name: "異常検知スキャン",           icon: "🔍", type: "検知",    priority: "high" },
-    { name: "レポート生成",              icon: "📄", type: "出力",    priority: "medium" },
-    { name: "キャッシュ最適化",           icon: "⚡", type: "最適化",  priority: "low" },
-    { name: "セキュリティ検証",           icon: "🔒", type: "検証",    priority: "high" },
-    { name: "データベースクエリ最適化",    icon: "🗄️", type: "DB",     priority: "medium" },
-    { name: "スケジュールタスク同期",      icon: "🔄", type: "同期",    priority: "low" },
-    { name: "メトリクス集計",             icon: "📈", type: "分析",    priority: "medium" },
-    { name: "コンテンツ分類",             icon: "🏷️", type: "分類",    priority: "medium" },
-    { name: "通知ディスパッチ",           icon: "📡", type: "通信",    priority: "low" },
-    { name: "バッチ変換処理",             icon: "🔧", type: "変換",    priority: "high" },
-  ];
+  let W, H, particles = [];
+  const COUNT = 90;
+  const COLORS = ['#00d4ff', '#7c3aed', '#00ff9d', '#ff6b35'];
 
-  const LOG_MESSAGES = {
-    start:    ["タスク受信: ", "処理開始: ", "キューから取得: "],
-    progress: ["解析中…", "演算実行中…", "データ処理中…", "変換中…", "検証中…"],
-    done:     ["完了 ✓", "処理成功 ✓", "出力完了 ✓"],
-    idle:     ["待機中…キューを監視", "アイドル状態", "次タスク待ち"],
-  };
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
 
-  // ── 状態 ──────────────────────────────────
-  let taskIdCounter = 0;
-  const startTime = Date.now();
-  const pendingQueue = [];
-  const doneList = [];
-  const throughputHistory = Array.from({ length: CHART_BARS }, () => ({ tasks: 0, agents: 0 }));
-  let totalCompleted = 0;
-  let completedLastMinute = [];
+  function rand(min, max) { return Math.random() * (max - min) + min; }
 
-  const agents = [
-    { id: 0, task: null, progress: 0, completed: 0, startedAt: null, status: "idle" },
-    { id: 1, task: null, progress: 0, completed: 0, startedAt: null, status: "idle" },
-    { id: 2, task: null, progress: 0, completed: 0, startedAt: null, status: "idle" },
-    { id: 3, task: null, progress: 0, completed: 0, startedAt: null, status: "idle" },
-  ];
+  function createParticle() {
+    return {
+      x:     rand(0, W),
+      y:     rand(0, H),
+      r:     rand(0.6, 2.2),
+      vx:    rand(-0.25, 0.25),
+      vy:    rand(-0.35, -0.08),
+      alpha: rand(0.15, 0.7),
+      da:    rand(-0.003, 0.003),
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    };
+  }
 
-  // ── DOM参照 ────────────────────────────────
-  const $ = (id) => document.getElementById(id);
-
-  // ── ユーティリティ ─────────────────────────
-  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-  const fmtTime = (ms) => {
-    const s = Math.floor(ms / 1000);
-    if (s < 60) return s + "s";
-    if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
-    return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
-  };
-
-  // ── パーティクルキャンバス ─────────────────
-  function initParticles() {
-    const canvas = $("particle-canvas");
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    let w, h;
-    const particles = [];
-
-    function resize() {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
-    }
+  function init() {
     resize();
-    window.addEventListener("resize", resize);
+    particles = Array.from({ length: COUNT }, createParticle);
+  }
 
-    // パーティクル生成
-    for (let i = 0; i < 60; i++) {
-      particles.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 2 + 0.5,
-        alpha: Math.random() * 0.5 + 0.1,
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.alpha += p.da;
+
+      if (p.alpha <= 0 || p.alpha >= 0.75) p.da = -p.da;
+      if (p.y < -10) { p.y = H + 10; p.x = rand(0, W); }
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // draw faint connecting lines between close particles
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 90) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = '#00d4ff';
+          ctx.globalAlpha = (1 - dist / 90) * 0.06;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener('resize', resize);
+  init();
+  tick();
+})();
+
+/* =============================================
+   SCROLL REVEAL
+   ============================================= */
+(function initReveal() {
+  const els = document.querySelectorAll('.reveal');
+  const obs = new IntersectionObserver(
+    (entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          obs.unobserve(e.target);
+        }
       });
-    }
+    },
+    { threshold: 0.12 }
+  );
+  els.forEach(el => obs.observe(el));
+})();
 
-    function draw() {
-      ctx.clearRect(0, 0, w, h);
+/* =============================================
+   AGENT SIMULATION ENGINE
+   ============================================= */
+const Sim = (() => {
+  /* ---- Task pool ---- */
+  const TASKS = [
+    { name: 'データセット解析',      type: '機械学習',         icon: '📊', priority: 'high',   dur: [3500, 6000] },
+    { name: 'API レスポンス検証',    type: 'ネットワーク',     icon: '🌐', priority: 'medium', dur: [2500, 5000] },
+    { name: 'ログ異常検知',          type: 'セキュリティ',     icon: '🔍', priority: 'high',   dur: [4000, 7000] },
+    { name: 'モデル推論バッチ',      type: 'AI/ML',            icon: '🧠', priority: 'high',   dur: [5000, 9000] },
+    { name: 'キャッシュ最適化',      type: 'パフォーマンス',   icon: '⚡', priority: 'low',    dur: [2000, 4000] },
+    { name: 'トークナイザー処理',    type: 'NLP',               icon: '📝', priority: 'medium', dur: [3000, 5500] },
+    { name: 'ベクトル埋め込み生成',  type: 'AI/ML',            icon: '🔢', priority: 'medium', dur: [4500, 7500] },
+    { name: 'リアルタイム翻訳',      type: 'NLP',               icon: '🌏', priority: 'high',   dur: [3000, 5000] },
+    { name: 'スケジューラ最適化',    type: 'オーケストレーション', icon: '📅', priority: 'low', dur: [2500, 4500] },
+    { name: 'コード品質チェック',    type: '開発',              icon: '💻', priority: 'medium', dur: [3500, 6500] },
+    { name: '画像認識パイプライン',  type: 'ビジョン',         icon: '🖼️', priority: 'high',   dur: [5000, 8500] },
+    { name: 'レポート自動生成',      type: '出力',              icon: '📄', priority: 'low',    dur: [2000, 3500] },
+    { name: 'クラスタリング処理',    type: '統計',              icon: '🎯', priority: 'medium', dur: [4000, 6000] },
+    { name: '依存関係グラフ構築',    type: '構造解析',         icon: '🕸️', priority: 'low',    dur: [3000, 5000] },
+    { name: '音声テキスト変換',      type: '音声処理',         icon: '🎤', priority: 'high',   dur: [4500, 8000] },
+    { name: 'エラーリカバリ処理',    type: '障害対応',         icon: '🛡️', priority: 'high',   dur: [2500, 4500] },
+  ];
 
-      // 接続線
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 150) {
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(0, 212, 255, ${0.08 * (1 - dist / 150)})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      }
+  const LOG_MESSAGES = [
+    ['[INFO] データを読み込み中...', 'info'],
+    ['[INFO] モデルを初期化しています', 'info'],
+    ['[PROC] バッチを処理中 (1/3)...', 'info'],
+    ['[PROC] バッチを処理中 (2/3)...', 'info'],
+    ['[PROC] バッチを処理中 (3/3)...', 'info'],
+    ['[CALC] パラメータを最適化中...', 'info'],
+    ['[NET]  接続を確立しています...', 'info'],
+    ['[MEM]  キャッシュを確認中...', 'info'],
+    ['[WARN] レイテンシ上昇を検知', 'warn'],
+    ['[INFO] リトライ中 (1/3)...', 'warn'],
+    ['[INFO] チェックポイント保存済み', 'info'],
+    ['[INFO] 結果をシリアライズ中...', 'info'],
+    ['[INFO] バリデーション通過', 'ok'],
+    ['[PROC] 後処理を実行中...', 'info'],
+  ];
 
-      // パーティクル描画
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0 || p.x > w) p.vx *= -1;
-        if (p.y < 0 || p.y > h) p.vy *= -1;
+  /* ---- Agents ---- */
+  const agents = [0, 1, 2, 3].map(i => ({
+    id: i,
+    busy: false,
+    completed: 0,
+    startTime: Date.now(),
+    currentTask: null,
+  }));
 
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 212, 255, ${p.alpha})`;
-        ctx.fill();
-      }
+  /* ---- State ---- */
+  let pendingQueue   = [];
+  let doneLog        = [];
+  let totalCompleted = 0;
+  let completedTimes = [];
+  let throughputHistory = Array.from({ length: 20 }, () => ({ tasks: 0, agents: 0 }));
 
-      requestAnimationFrame(draw);
-    }
-    draw();
+  /* ---- DOM helpers ---- */
+  const $  = id => document.getElementById(id);
+  const fmt = n  => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+
+  function setBadge(agentId, text, cls) {
+    const el = $(`badge-${agentId}`);
+    if (!el) return;
+    el.textContent = text;
+    el.className = `agent-status-badge ${cls}`;
   }
 
-  // ── スクロールRevealアニメーション ──────────
-  function initReveal() {
-    const els = document.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("visible");
-          }
-        }
-      },
-      { threshold: 0.15 }
-    );
-    els.forEach((el) => observer.observe(el));
+  function setTask(agentId, text) {
+    const el = $(`task-${agentId}`);
+    if (el) el.textContent = text;
   }
 
-  // ── スループットチャート初期化 ─────────────
-  function initChart() {
-    const chart = $("throughput-chart");
-    if (!chart) return;
-    chart.innerHTML = "";
-    for (let i = 0; i < CHART_BARS; i++) {
-      const group = document.createElement("div");
-      group.className = "bar-group";
-      group.innerHTML = `<div class="chart-bar tasks" id="cb-t-${i}" style="height:4px"></div>
-                          <div class="chart-bar agents" id="cb-a-${i}" style="height:4px"></div>`;
-      chart.appendChild(group);
+  function setProgress(agentId, pct) {
+    const fill = $(`fill-${agentId}`);
+    const pctEl = $(`pct-${agentId}`);
+    const track = fill && fill.closest('[role="progressbar"]');
+    if (fill)  fill.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    if (track) track.setAttribute('aria-valuenow', pct);
+  }
+
+  function setCardState(agentId, state) {
+    const card = document.querySelector(`.agent-card[data-agent="${agentId}"]`);
+    if (!card) return;
+    card.classList.remove('processing', 'idle', 'done');
+    if (state) card.classList.add(state);
+  }
+
+  function addLog(agentId, text, type) {
+    const container = $(`log-${agentId}`);
+    if (!container) return;
+    // Keep max 3 lines visible
+    while (container.children.length >= 3) {
+      container.removeChild(container.firstChild);
     }
+    const el = document.createElement('div');
+    el.className = 'log-entry' + (type ? ' ' + type : '');
+    el.textContent = text;
+    container.appendChild(el);
   }
 
-  // ── ログ追加 ───────────────────────────────
-  function addLog(agentId, message, type = "") {
-    const log = $(`log-${agentId}`);
-    if (!log) return;
-    const entry = document.createElement("div");
-    entry.className = `log-entry ${type}`;
-    const now = new Date();
-    const ts = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-    entry.textContent = `[${ts}] ${message}`;
-    log.insertBefore(entry, log.firstChild);
-    // 最大4行
-    while (log.children.length > 4) {
-      log.removeChild(log.lastChild);
-    }
+  function updateMiniStats(agentId) {
+    const a = agents[agentId];
+    const el = $(`completed-${agentId}`);
+    if (el) el.textContent = a.completed;
+
+    const elapsed = (Date.now() - a.startTime) / 60000;
+    const speed = elapsed > 0.1 ? (a.completed / elapsed).toFixed(1) : '—';
+    const speedEl = $(`speed-${agentId}`);
+    if (speedEl) speedEl.textContent = speed;
   }
 
-  // ── 待機キューUI更新 ──────────────────────
+  /* ---- Task queue rendering ---- */
   function renderPendingQueue() {
-    const ul = $("pending-queue");
+    const ul = $('pending-queue');
     if (!ul) return;
-    ul.innerHTML = "";
-    const display = pendingQueue.slice(0, MAX_PENDING);
-    for (const task of display) {
-      const li = document.createElement("li");
-      li.className = "task-item";
+    ul.innerHTML = '';
+    const slice = pendingQueue.slice(0, 7);
+    if (slice.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'task-item';
+      li.style.cssText = 'opacity:0.4;justify-content:center;font-size:0.72rem;';
+      li.textContent = '— キューが空です —';
+      ul.appendChild(li);
+      return;
+    }
+    slice.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'task-item';
       li.innerHTML = `
-        <div class="task-icon">${task.icon}</div>
+        <span class="task-icon">${t.icon}</span>
         <div class="task-info">
-          <div class="task-name">${task.name}</div>
-          <div class="task-type">${task.type} · #${task.id}</div>
+          <div class="task-name">${t.name}</div>
+          <div class="task-type">${t.type}</div>
         </div>
-        <div class="task-priority p-${task.priority}">${task.priority}</div>`;
+        <span class="task-priority p-${t.priority}">${t.priority}</span>
+      `;
       ul.appendChild(li);
-    }
-    if (pendingQueue.length > MAX_PENDING) {
-      const li = document.createElement("li");
-      li.className = "task-item";
-      li.innerHTML = `<div class="task-icon">…</div>
-        <div class="task-info"><div class="task-name">他 ${pendingQueue.length - MAX_PENDING} 件が待機中</div></div>`;
-      ul.appendChild(li);
-    }
-    if (pendingQueue.length === 0) {
-      const li = document.createElement("li");
-      li.className = "task-item";
-      li.innerHTML = `<div class="task-icon">💤</div>
-        <div class="task-info"><div class="task-name" style="color:var(--text-muted)">キュー空 — 新規タスク待ち</div></div>`;
-      ul.appendChild(li);
-    }
+    });
   }
 
-  // ── 完了ログUI更新 ────────────────────────
-  function renderDoneQueue() {
-    const ul = $("done-queue");
+  function renderDoneLog() {
+    const ul = $('done-queue');
     if (!ul) return;
-    ul.innerHTML = "";
-    const display = doneList.slice(-MAX_DONE).reverse();
-    for (const task of display) {
-      const li = document.createElement("li");
-      li.className = "task-item";
-      li.style.borderColor = "rgba(0,255,157,0.15)";
+    ul.innerHTML = '';
+    const slice = doneLog.slice(0, 7);
+    if (slice.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'task-item';
+      li.style.cssText = 'opacity:0.4;justify-content:center;font-size:0.72rem;';
+      li.textContent = '— 完了タスクなし —';
+      ul.appendChild(li);
+      return;
+    }
+    slice.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'task-item';
+      const secs = Math.round((Date.now() - t.finishedAt) / 1000);
       li.innerHTML = `
-        <div class="task-icon">${task.icon}</div>
+        <span class="task-icon">✅</span>
         <div class="task-info">
-          <div class="task-name">${task.name}</div>
-          <div class="task-type">${task.type} · Agent ${["Alpha","Beta","Gamma","Delta"][task.completedBy]} · ${task.duration}s</div>
+          <div class="task-name">${t.name}</div>
+          <div class="task-type">${secs}秒前</div>
         </div>
-        <div class="task-priority" style="background:rgba(0,255,157,0.15);color:var(--accent-green)">done</div>`;
+        <span class="task-priority p-low">完了</span>
+      `;
       ul.appendChild(li);
-    }
-    if (doneList.length === 0) {
-      const li = document.createElement("li");
-      li.className = "task-item";
-      li.innerHTML = `<div class="task-icon">⏳</div>
-        <div class="task-info"><div class="task-name" style="color:var(--text-muted)">まだ完了タスクなし</div></div>`;
-      ul.appendChild(li);
-    }
+    });
   }
 
-  // ── エージェントUI更新 ─────────────────────
-  function updateAgentUI(agent) {
-    const badge = $(`badge-${agent.id}`);
-    const taskEl = $(`task-${agent.id}`);
-    const fill = $(`fill-${agent.id}`);
-    const pct = $(`pct-${agent.id}`);
-    const completedEl = $(`completed-${agent.id}`);
-    const speedEl = $(`speed-${agent.id}`);
-    const uptimeEl = $(`uptime-${agent.id}`);
-    const card = document.querySelector(`.agent-card[data-agent="${agent.id}"]`);
-
-    if (!badge) return;
-
-    // ステータスバッジ
-    badge.className = "agent-status-badge";
-    if (agent.status === "idle") {
-      badge.classList.add("status-idle");
-      badge.textContent = "待機中";
-      card.classList.remove("processing");
-    } else if (agent.status === "active") {
-      badge.classList.add("status-active");
-      badge.textContent = "処理中";
-      card.classList.add("processing");
-    } else if (agent.status === "done") {
-      badge.classList.add("status-done");
-      badge.textContent = "完了";
-      card.classList.remove("processing");
-    }
-
-    // タスク名
-    if (agent.task) {
-      taskEl.textContent = `${agent.task.icon} ${agent.task.name}`;
-    } else {
-      taskEl.textContent = "— タスク待機中 —";
-    }
-
-    // プログレスバー
-    fill.style.width = `${agent.progress}%`;
-    pct.textContent = `${Math.floor(agent.progress)}%`;
-
-    // ミニ統計
-    completedEl.textContent = agent.completed;
-    speedEl.textContent = agent.completed > 0
-      ? (agent.completed / ((Date.now() - startTime) / 60000)).toFixed(1) + "/m"
-      : "—";
-    uptimeEl.textContent = fmtTime(Date.now() - startTime);
-  }
-
-  // ── グローバル統計更新 ─────────────────────
+  /* ---- Global stats ---- */
   function updateGlobalStats() {
+    const completedEl = $('stat-completed');
+    if (completedEl) completedEl.textContent = fmt(totalCompleted);
+
     const now = Date.now();
-    completedLastMinute = completedLastMinute.filter((t) => now - t < 60000);
-
-    const statCompleted = $("stat-completed");
-    const statSpeed = $("stat-speed");
-    const statUptime = $("stat-uptime");
-    const statParallel = $("stat-parallel");
-
-    if (statCompleted) statCompleted.textContent = totalCompleted;
-    if (statSpeed) statSpeed.textContent = completedLastMinute.length;
-    if (statUptime) statUptime.textContent = fmtTime(now - startTime);
-
-    // 現在並列処理中の数
-    const activeCount = agents.filter((a) => a.status === "active").length;
-    if (statParallel) statParallel.textContent = activeCount;
-
-    const delta = $("stat-parallel-delta");
-    if (delta) delta.textContent = activeCount === 4 ? "★ フル稼働中!" : `↑ ${activeCount}/4 稼働`;
+    const recent = completedTimes.filter(t => now - t < 60000).length;
+    const speedEl = $('stat-speed');
+    if (speedEl) speedEl.textContent = recent;
   }
 
-  // ── スループットチャート更新 ───────────────
-  function updateChart() {
-    const activeCount = agents.filter((a) => a.status === "active").length;
-    const recentDone = doneList.filter((t) => Date.now() - t.finishedAt < 1000).length;
+  /* ---- Throughput chart ---- */
+  function updateChart(tasksThisTick, activeAgents) {
+    throughputHistory.shift();
+    throughputHistory.push({ tasks: tasksThisTick, agents: activeAgents });
 
-    throughputHistory.push({ tasks: recentDone, agents: activeCount });
-    if (throughputHistory.length > CHART_BARS) throughputHistory.shift();
+    const chart = $('throughput-chart');
+    if (!chart) return;
 
-    for (let i = 0; i < CHART_BARS; i++) {
-      const d = throughputHistory[i] || { tasks: 0, agents: 0 };
-      const tBar = $(`cb-t-${i}`);
-      const aBar = $(`cb-a-${i}`);
-      if (tBar) tBar.style.height = Math.max(4, d.tasks * 30) + "px";
-      if (aBar) aBar.style.height = Math.max(4, d.agents * 25) + "px";
-    }
+    const maxTasks  = Math.max(1, ...throughputHistory.map(b => b.tasks));
+    const maxAgents = Math.max(1, ...throughputHistory.map(b => b.agents));
+
+    chart.innerHTML = '';
+    throughputHistory.forEach(bucket => {
+      const group = document.createElement('div');
+      group.className = 'bar-group';
+
+      const b1 = document.createElement('div');
+      b1.className = 'chart-bar tasks';
+      b1.style.height = (bucket.tasks  / maxTasks  * 100) + '%';
+
+      const b2 = document.createElement('div');
+      b2.className = 'chart-bar agents';
+      b2.style.height = (bucket.agents / maxAgents * 100) + '%';
+
+      group.appendChild(b1);
+      group.appendChild(b2);
+      chart.appendChild(group);
+    });
   }
 
-  // ── タスク生成 ─────────────────────────────
-  function maybeSpawnTask() {
-    if (Math.random() < TASK_SPAWN_CHANCE && pendingQueue.length < 15) {
-      const template = pick(TASK_POOL);
-      const task = {
-        ...template,
-        id: ++taskIdCounter,
-        duration: randInt(3, 12), // 処理に必要なtick数
-        createdAt: Date.now(),
-      };
-      pendingQueue.push(task);
-    }
+  /* ---- Uptime counter ---- */
+  const appStart = Date.now();
+
+  function updateUptime() {
+    const s = Math.floor((Date.now() - appStart) / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const str = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+
+    const el = $('stat-uptime');
+    if (el) el.textContent = str;
+
+    agents.forEach(a => {
+      const as = Math.floor((Date.now() - a.startTime) / 1000);
+      const aEl = $(`uptime-${a.id}`);
+      if (aEl) {
+        const am = Math.floor(as / 60);
+        aEl.textContent = am > 0 ? `${am}m ${as % 60}s` : `${as}s`;
+      }
+    });
   }
 
-  // ── エージェントメインループ ──────────────
-  function tickAgent(agent) {
-    if (agent.status === "idle" || agent.status === "done") {
-      // タスクを取得
-      if (pendingQueue.length > 0) {
-        agent.task = pendingQueue.shift();
-        agent.progress = 0;
-        agent.status = "active";
-        agent.startedAt = Date.now();
-        addLog(agent.id, pick(LOG_MESSAGES.start) + agent.task.name, "info");
-      } else {
-        agent.status = "idle";
-        agent.progress = 0;
-        if (Math.random() < 0.02) {
-          addLog(agent.id, pick(LOG_MESSAGES.idle));
-        }
-      }
-    }
+  /* ---- Core: assign task to agent ---- */
+  function assignTask(agent) {
+    if (pendingQueue.length === 0) return;
+    const task = pendingQueue.shift();
+    agent.busy = true;
+    agent.currentTask = task;
 
-    if (agent.status === "active" && agent.task) {
-      // 進捗を加算（ランダムに速度変動）
-      const increment = (100 / agent.task.duration) * (0.7 + Math.random() * 0.6);
-      agent.progress = Math.min(100, agent.progress + increment);
+    renderPendingQueue();
+    setCardState(agent.id, 'processing');
+    setBadge(agent.id, '処理中', 'status-active');
+    setTask(agent.id, `${task.icon} ${task.name}`);
+    setProgress(agent.id, 0);
+    addLog(agent.id, `[INFO] タスク開始: ${task.name}`, 'info');
 
-      // 途中ログ
-      if (agent.progress > 30 && agent.progress < 35) {
-        addLog(agent.id, pick(LOG_MESSAGES.progress));
-      }
-      if (agent.progress > 65 && agent.progress < 70) {
-        addLog(agent.id, pick(LOG_MESSAGES.progress));
+    const totalDur = task.dur[0] + Math.random() * (task.dur[1] - task.dur[0]);
+    const tickMs   = 250;
+    const steps    = Math.round(totalDur / tickMs);
+    let   step     = 0;
+    let   nextLogAt = Math.floor(steps * (0.2 + Math.random() * 0.25));
+
+    const interval = setInterval(() => {
+      step++;
+      const pct = Math.min(100, Math.round((step / steps) * 100));
+      setProgress(agent.id, pct);
+
+      if (step === nextLogAt) {
+        const [msg, type] = LOG_MESSAGES[Math.floor(Math.random() * LOG_MESSAGES.length)];
+        addLog(agent.id, msg, type);
+        nextLogAt += Math.floor(steps * (0.15 + Math.random() * 0.2));
       }
 
-      // 完了
-      if (agent.progress >= 100) {
-        agent.progress = 100;
+      if (step >= steps) {
+        clearInterval(interval);
+
+        agent.busy = false;
         agent.completed++;
         totalCompleted++;
-        completedLastMinute.push(Date.now());
+        completedTimes.push(Date.now());
 
-        const finishedTask = {
-          ...agent.task,
-          completedBy: agent.id,
-          finishedAt: Date.now(),
-          duration: ((Date.now() - agent.startedAt) / 1000).toFixed(1),
-        };
-        doneList.push(finishedTask);
+        doneLog.unshift({ ...task, finishedAt: Date.now() });
+        if (doneLog.length > 20) doneLog.pop();
 
-        addLog(agent.id, pick(LOG_MESSAGES.done) + ` [${agent.task.name}]`, "ok");
-        agent.status = "done";
-        agent.task = null;
+        setProgress(agent.id, 100);
+        setBadge(agent.id, '完了', 'status-done');
+        setCardState(agent.id, '');
+        addLog(agent.id, `[OK]   完了: ${task.name}`, 'ok');
+        updateMiniStats(agent.id);
+        updateGlobalStats();
+        renderDoneLog();
+
+        // brief completion pause, then go idle
+        setTimeout(() => {
+          setBadge(agent.id, '待機中', 'status-idle');
+          setTask(agent.id, '— タスク待機中 —');
+          setProgress(agent.id, 0);
+          setCardState(agent.id, 'idle');
+          agent.currentTask = null;
+
+          setTimeout(() => tryAssign(agent.id), 300 + Math.random() * 600);
+        }, 600);
       }
-    }
-
-    updateAgentUI(agent);
+    }, tickMs);
   }
 
-  // ── メインループ ──────────────────────────
-  function mainLoop() {
-    maybeSpawnTask();
-
-    for (const agent of agents) {
-      tickAgent(agent);
+  function tryAssign(agentId) {
+    const agent = agents[agentId];
+    if (!agent.busy && pendingQueue.length > 0) {
+      assignTask(agent);
     }
+  }
 
+  /* ---- Task generator ---- */
+  function spawnTask() {
+    if (pendingQueue.length >= 10) return;
+    const task = { ...TASKS[Math.floor(Math.random() * TASKS.length)] };
+    pendingQueue.push(task);
     renderPendingQueue();
-    renderDoneQueue();
-    updateGlobalStats();
-    updateChart();
+
+    // Immediately hand off to a free agent if available
+    const idle = agents.find(a => !a.busy);
+    if (idle) assignTask(idle);
   }
 
-  // ── 初期化 ────────────────────────────────
-  function init() {
-    initParticles();
-    initReveal();
-    initChart();
+  /* ---- Tick loop (250ms) ---- */
+  let tickCount = 0;
 
-    // 初期タスクを数件投入
+  function gameTick() {
+    tickCount++;
+
+    updateUptime();
+
+    const activeAgents = agents.filter(a => a.busy).length;
+
+    if (tickCount % 4 === 0) {
+      const now = Date.now();
+      const recentCompletions = completedTimes.filter(t => now - t < 1000).length;
+      updateChart(recentCompletions, activeAgents);
+    }
+
+    const navStatus = $('nav-status-text');
+    if (navStatus) {
+      navStatus.textContent = activeAgents > 0
+        ? `${activeAgents}エージェント稼働中`
+        : 'システム稼働中';
+    }
+  }
+
+  /* ---- Boot ---- */
+  function boot() {
+    // Pre-fill task queue
     for (let i = 0; i < 6; i++) {
-      const template = pick(TASK_POOL);
-      pendingQueue.push({
-        ...template,
-        id: ++taskIdCounter,
-        duration: randInt(3, 12),
-        createdAt: Date.now(),
-      });
+      pendingQueue.push({ ...TASKS[i % TASKS.length] });
     }
-
     renderPendingQueue();
-    renderDoneQueue();
+    renderDoneLog();
+    updateChart(0, 0);
 
-    // メインループ開始
-    setInterval(mainLoop, TICK_MS);
+    // Staggered agent start
+    agents.forEach((agent, i) => {
+      setTimeout(() => {
+        setCardState(agent.id, 'idle');
+        setBadge(agent.id, '待機中', 'status-idle');
+        tryAssign(agent.id);
+      }, i * 700 + 400);
+    });
 
-    // チャート更新は少し遅めに
-    setInterval(updateChart, 1000);
+    // Spawn new tasks at ~3–5s intervals
+    setInterval(spawnTask, 3500 + Math.random() * 1500);
+
+    // Main simulation tick
+    setInterval(gameTick, 250);
   }
 
-  // DOM準備完了後に初期化
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    init();
+    boot();
   }
+
+  return { agents, pendingQueue };
 })();
