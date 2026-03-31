@@ -1,12 +1,395 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My GitHub Pages Site</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>サブエージェント自動化システム — Sub-Agent Automation</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <h1>Welcome to My GitHub Pages Site</h1>
-    <p>This is my first GitHub Pages deployment!</p>
+
+<!-- Particle canvas -->
+<canvas id="particle-canvas"></canvas>
+<div class="grid-bg" aria-hidden="true"></div>
+
+<!-- ===== NAVIGATION ===== -->
+<nav aria-label="メインナビゲーション">
+  <div class="nav-inner">
+    <div class="nav-logo">⬡ SAAS · サブエージェントシステム</div>
+    <div class="nav-status">
+      <div class="pulse-dot" aria-hidden="true"></div>
+      <span id="nav-status-text">システム稼働中</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section id="hero" aria-labelledby="hero-heading">
+  <div class="container">
+    <div class="hero-badge" aria-hidden="true">▸ AI ORCHESTRATION PLATFORM · v2.4.1</div>
+
+    <h1 class="hero-title" id="hero-heading">
+      <span class="line-jp">サブエージェント自動化システム</span>
+      <span class="line-en">Sub-Agent Automation System</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      複数のAIエージェントが並列で協調しながらタスクを分担・処理する次世代型オーケストレーションプラットフォーム。
+      スピード、精度、スケーラビリティを同時に実現します。
+    </p>
+
+    <div class="hero-cta">
+      <button class="btn btn-primary" onclick="document.getElementById('dashboard').scrollIntoView({behavior:'smooth'})">
+        ⚡ ダッシュボードを見る
+      </button>
+      <button class="btn btn-secondary" onclick="document.getElementById('explanation').scrollIntoView({behavior:'smooth'})">
+        📖 仕組みを理解する
+      </button>
+    </div>
+
+    <div class="scroll-hint" aria-hidden="true">
+      <span>スクロールして詳細を見る</span>
+      <div class="scroll-arrow"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== DASHBOARD ===== -->
+<section id="dashboard" aria-labelledby="dashboard-heading">
+  <div class="container">
+
+    <div class="section-header reveal">
+      <div class="section-tag">LIVE DASHBOARD</div>
+      <h2 class="section-title" id="dashboard-heading">
+        エージェント <span>リアルタイム監視</span>
+      </h2>
+      <p class="section-desc">4つのサブエージェントが独立したタスクキューを処理しています</p>
+    </div>
+
+    <!-- Agent cards -->
+    <div class="agents-grid reveal" id="agents-grid">
+
+      <!-- Agent 0 -->
+      <div class="agent-card" data-agent="0" role="region" aria-label="エージェント Alpha">
+        <div class="scan-line" aria-hidden="true"></div>
+        <div class="agent-header">
+          <div class="agent-icon" aria-hidden="true">🔬</div>
+          <div class="agent-meta">
+            <div class="agent-name">Agent Alpha</div>
+            <div class="agent-role">データ解析エージェント</div>
+          </div>
+          <div class="agent-status-badge status-idle" id="badge-0">待機中</div>
+        </div>
+        <div class="agent-task" id="task-0">— タスク待機中 —</div>
+        <div class="progress-row">
+          <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-labelledby="task-0">
+            <div class="progress-bar-fill" id="fill-0"></div>
+          </div>
+          <div class="progress-pct" id="pct-0">0%</div>
+        </div>
+        <div class="agent-mini-stats">
+          <div class="mini-stat">
+            <div class="ms-val" id="completed-0">0</div>
+            <div class="ms-lbl">完了数</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="speed-0">—</div>
+            <div class="ms-lbl">処理速度</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="uptime-0">0s</div>
+            <div class="ms-lbl">稼働時間</div>
+          </div>
+        </div>
+        <div class="agent-log" id="log-0" aria-live="polite" aria-label="エージェントAlphaのログ"></div>
+      </div>
+
+      <!-- Agent 1 -->
+      <div class="agent-card" data-agent="1" role="region" aria-label="エージェント Beta">
+        <div class="scan-line" aria-hidden="true"></div>
+        <div class="agent-header">
+          <div class="agent-icon" aria-hidden="true">🧠</div>
+          <div class="agent-meta">
+            <div class="agent-name">Agent Beta</div>
+            <div class="agent-role">推論・判断エージェント</div>
+          </div>
+          <div class="agent-status-badge status-idle" id="badge-1">待機中</div>
+        </div>
+        <div class="agent-task" id="task-1">— タスク待機中 —</div>
+        <div class="progress-row">
+          <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-labelledby="task-1">
+            <div class="progress-bar-fill" id="fill-1"></div>
+          </div>
+          <div class="progress-pct" id="pct-1">0%</div>
+        </div>
+        <div class="agent-mini-stats">
+          <div class="mini-stat">
+            <div class="ms-val" id="completed-1">0</div>
+            <div class="ms-lbl">完了数</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="speed-1">—</div>
+            <div class="ms-lbl">処理速度</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="uptime-1">0s</div>
+            <div class="ms-lbl">稼働時間</div>
+          </div>
+        </div>
+        <div class="agent-log" id="log-1" aria-live="polite" aria-label="エージェントBetaのログ"></div>
+      </div>
+
+      <!-- Agent 2 -->
+      <div class="agent-card" data-agent="2" role="region" aria-label="エージェント Gamma">
+        <div class="scan-line" aria-hidden="true"></div>
+        <div class="agent-header">
+          <div class="agent-icon" aria-hidden="true">⚙️</div>
+          <div class="agent-meta">
+            <div class="agent-name">Agent Gamma</div>
+            <div class="agent-role">実行・統合エージェント</div>
+          </div>
+          <div class="agent-status-badge status-idle" id="badge-2">待機中</div>
+        </div>
+        <div class="agent-task" id="task-2">— タスク待機中 —</div>
+        <div class="progress-row">
+          <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-labelledby="task-2">
+            <div class="progress-bar-fill" id="fill-2"></div>
+          </div>
+          <div class="progress-pct" id="pct-2">0%</div>
+        </div>
+        <div class="agent-mini-stats">
+          <div class="mini-stat">
+            <div class="ms-val" id="completed-2">0</div>
+            <div class="ms-lbl">完了数</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="speed-2">—</div>
+            <div class="ms-lbl">処理速度</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="uptime-2">0s</div>
+            <div class="ms-lbl">稼働時間</div>
+          </div>
+        </div>
+        <div class="agent-log" id="log-2" aria-live="polite" aria-label="エージェントGammaのログ"></div>
+      </div>
+
+      <!-- Agent 3 -->
+      <div class="agent-card" data-agent="3" role="region" aria-label="エージェント Delta">
+        <div class="scan-line" aria-hidden="true"></div>
+        <div class="agent-header">
+          <div class="agent-icon" aria-hidden="true">📡</div>
+          <div class="agent-meta">
+            <div class="agent-name">Agent Delta</div>
+            <div class="agent-role">出力・通信エージェント</div>
+          </div>
+          <div class="agent-status-badge status-idle" id="badge-3">待機中</div>
+        </div>
+        <div class="agent-task" id="task-3">— タスク待機中 —</div>
+        <div class="progress-row">
+          <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-labelledby="task-3">
+            <div class="progress-bar-fill" id="fill-3"></div>
+          </div>
+          <div class="progress-pct" id="pct-3">0%</div>
+        </div>
+        <div class="agent-mini-stats">
+          <div class="mini-stat">
+            <div class="ms-val" id="completed-3">0</div>
+            <div class="ms-lbl">完了数</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="speed-3">—</div>
+            <div class="ms-lbl">処理速度</div>
+          </div>
+          <div class="mini-stat">
+            <div class="ms-val" id="uptime-3">0s</div>
+            <div class="ms-lbl">稼働時間</div>
+          </div>
+        </div>
+        <div class="agent-log" id="log-3" aria-live="polite" aria-label="エージェントDeltaのログ"></div>
+      </div>
+
+    </div><!-- /agents-grid -->
+  </div>
+</section>
+
+<!-- ===== TASK QUEUE ===== -->
+<section id="queue" aria-labelledby="queue-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-tag">TASK ORCHESTRATION</div>
+      <h2 class="section-title" id="queue-heading">タスク <span>キュー管理</span></h2>
+      <p class="section-desc">オーケストレーターが受信したタスクをエージェントへ動的に割り当てます</p>
+    </div>
+
+    <div class="queue-wrapper reveal">
+      <div class="queue-panel">
+        <div class="queue-panel-title">📋 待機キュー</div>
+        <ul class="task-list" id="pending-queue" aria-label="待機中のタスク一覧"></ul>
+      </div>
+      <div class="queue-panel">
+        <div class="queue-panel-title" style="--dot-color: var(--accent-green);">✅ 完了ログ</div>
+        <ul class="task-list" id="done-queue" aria-label="完了したタスク一覧"></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== EXPLANATION ===== -->
+<section id="explanation" aria-labelledby="explanation-heading">
+  <div class="container">
+
+    <div class="explanation-grid">
+
+      <div class="explanation-text reveal">
+        <h2 id="explanation-heading">
+          <span>サブエージェント</span>の<br>仕組みとは？
+        </h2>
+
+        <p>
+          サブエージェント自動化とは、一つの大きなタスクを複数の専門エージェントに分割し、
+          それぞれが並列で処理することで全体のスループットを劇的に向上させる技術です。
+        </p>
+
+        <p>
+          メインの<strong>オーケストレーター</strong>がタスクの分析・優先付け・割り当てを行い、
+          各サブエージェントは独立して専門的な処理を担当。結果はオーケストレーターが統合し、
+          最終的なアウトプットとして提供されます。
+        </p>
+
+        <ul class="feature-list">
+          <li>
+            <div class="fi" aria-hidden="true">✓</div>
+            <span><strong>並列処理:</strong> 複数タスクを同時並行で処理し、処理時間を大幅短縮</span>
+          </li>
+          <li>
+            <div class="fi" aria-hidden="true">✓</div>
+            <span><strong>専門化:</strong> 各エージェントは特定領域に特化した高精度な処理を実現</span>
+          </li>
+          <li>
+            <div class="fi" aria-hidden="true">✓</div>
+            <span><strong>耐障害性:</strong> 一部エージェントが停止してもシステム全体は継続稼働</span>
+          </li>
+          <li>
+            <div class="fi" aria-hidden="true">✓</div>
+            <span><strong>スケーラビリティ:</strong> 負荷に応じてエージェント数を動的に増減可能</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Flow diagram -->
+      <div class="flow-diagram reveal" aria-label="処理フロー図">
+
+        <div class="flow-node active-node">
+          <div class="flow-node-icon fn-orchestrator" aria-hidden="true">🎯</div>
+          <div class="flow-node-text">
+            <strong>オーケストレーター</strong>
+            <span>タスク受信・分析・優先付け・割り当て</span>
+          </div>
+        </div>
+
+        <div class="flow-arrow" aria-hidden="true">↓</div>
+
+        <div class="flow-node">
+          <div class="flow-node-icon fn-queue" aria-hidden="true">📦</div>
+          <div class="flow-node-text">
+            <strong>タスクキュー</strong>
+            <span>優先度付きFIFOキューでバッファリング</span>
+          </div>
+        </div>
+
+        <div class="flow-arrow" aria-hidden="true">↓</div>
+
+        <div class="flow-node">
+          <div class="flow-node-icon fn-agents" aria-hidden="true">🤖</div>
+          <div class="flow-node-text">
+            <strong>サブエージェント群（並列実行）</strong>
+            <span>Alpha · Beta · Gamma · Delta が同時処理</span>
+          </div>
+        </div>
+
+        <div class="flow-arrow" aria-hidden="true">↓</div>
+
+        <div class="flow-node">
+          <div class="flow-node-icon fn-result" aria-hidden="true">📊</div>
+          <div class="flow-node-text">
+            <strong>結果集約・出力</strong>
+            <span>オーケストレーターが結果をマージ・返却</span>
+          </div>
+        </div>
+
+      </div><!-- /flow-diagram -->
+    </div><!-- /explanation-grid -->
+  </div>
+</section>
+
+<!-- ===== STATS ===== -->
+<section id="stats" aria-labelledby="stats-heading">
+  <div class="container">
+
+    <div class="section-header reveal">
+      <div class="section-tag">SYSTEM METRICS</div>
+      <h2 class="section-title" id="stats-heading">システム <span>パフォーマンス</span></h2>
+      <p class="section-desc">リアルタイムで更新されるシステム全体のパフォーマンス指標</p>
+    </div>
+
+    <div class="stats-grid reveal">
+
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true">⚡</div>
+        <div class="stat-value" id="stat-parallel">4</div>
+        <div class="stat-label">並列処理数</div>
+        <div class="stat-delta" id="stat-parallel-delta">↑ 最大同時実行</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true">✅</div>
+        <div class="stat-value" id="stat-completed">0</div>
+        <div class="stat-label">完了タスク数</div>
+        <div class="stat-delta" id="stat-completed-delta">▶ セッション累計</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true">🚀</div>
+        <div class="stat-value" id="stat-speed">0</div>
+        <div class="stat-label">処理速度 (task/min)</div>
+        <div class="stat-delta" id="stat-speed-delta">↑ 直近1分間</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true">⏱️</div>
+        <div class="stat-value" id="stat-uptime">0s</div>
+        <div class="stat-label">システム稼働時間</div>
+        <div class="stat-delta">▶ 連続稼働中</div>
+      </div>
+
+    </div><!-- /stats-grid -->
+
+    <!-- Throughput chart -->
+    <div class="throughput-panel reveal" aria-label="スループットチャート">
+      <div class="tp-header">
+        <div class="tp-title">📈 タスクスループット（過去20秒）</div>
+        <div class="tp-legend" aria-hidden="true">
+          <span class="l-tasks">完了タスク</span>
+          <span class="l-agents">稼働エージェント</span>
+        </div>
+      </div>
+      <div id="throughput-chart" role="img" aria-label="スループットバーチャート"></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container">
+    <p>
+      <strong>サブエージェント自動化システム</strong> — Sub-Agent Automation Platform<br>
+      <small style="margin-top:0.4rem;display:block;">Powered by AI Orchestration · Parallel Processing · Autonomous Agents</small>
+    </p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
 </body>
 </html>
